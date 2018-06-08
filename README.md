@@ -53,12 +53,16 @@ example:
 
 // pandoc .html output option template that you would like to use
 "pandoc.htmlOptString": ""
+
+// render the document on an external server
+"pandoc.serverLocation":""
 ```
 
 * if necessary to set options for each output format.
   * default: `$ pandoc inFile.md -o outFile.{pdf|word|html}`
 
 ## Example: Setting for Japanese document
+
 
 * PDF
 
