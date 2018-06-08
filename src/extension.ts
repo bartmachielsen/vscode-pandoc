@@ -1,6 +1,8 @@
 import * as vscode from 'vscode'; 
 import {spawn, exec} from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as request from 'request';
 
 var pandocOutputChannel = vscode.window.createOutputChannel('Pandoc');
 
@@ -58,49 +60,64 @@ export function activate(context: vscode.ExtensionContext) {
             
             setStatusBarText('Generating', qpSelection.label);
             
-            var pandocOptions = getPandocOptions(qpSelection.label);
-            
-            // debug
-            console.log('debug: outFile = ' + inFile);
-            console.log('debug: inFile = ' + outFile);
-            console.log('debug: pandoc ' + inFile + ' -o ' + outFile + pandocOptions);
-            
-            var space = '\x20';            
-            var targetExec = 'pandoc' + space + inFile + space + '-o' + space + outFile + space + pandocOptions;
-            console.log('debug: exec ' + targetExec);
-            
-            var child = exec(targetExec, { cwd: filePath }, function(error, stdout, stderr) {
-                if (stdout !== null) {
-                    console.log(stdout.toString());
-                    pandocOutputChannel.append(stdout.toString() + '\n');
-                }
+            let serverLocation = vscode.workspace.getConfiguration('pandoc').get('serverLocation');
+            if(serverLocation){
+                var formData = {
+                    extension: '.'+qpSelection.label,
+                    m: fs.createReadStream(path.join(filePath, fileName)),
+                    t: fileNameOnly + '.' + qpSelection.label
+                  };
+                  console.log(fs.createWriteStream(path.join(filePath, fileNameOnly) + '.' + qpSelection.label));
+                  request.post({url:serverLocation, formData: formData}).pipe(fs.createWriteStream(path.join(filePath, fileNameOnly) + '.' + qpSelection.label)).on(
+                      "error",error => {console.error(error)}
+                  );
                 
-                if (stderr !== null) {
-                    console.log(stderr.toString());
-                    if (stderr !== "") {
-                    vscode.window.showErrorMessage('stderr: ' + stderr.toString());
-                    pandocOutputChannel.append('stderr: ' + stderr.toString() + '\n');
-                    }
-                }
+
+            } else {
+                var pandocOptions = getPandocOptions(qpSelection.label);
+                console.log('debug: outFile = ' + inFile);
+                console.log('debug: inFile = ' + outFile);
+                console.log('debug: pandoc ' + inFile + ' -o ' + outFile + pandocOptions);
                 
-                if (error !== null) {
-                    console.log('exec error: ' + error);
-                    vscode.window.showErrorMessage('exec error: ' + error);
-                    pandocOutputChannel.append('exec error: ' + error + '\n');
-                } else {
-                    setStatusBarText('Launching', qpSelection.label);
-                    switch(process.platform) {
-                      case 'darwin':
-                        exec('open ' + outFile);
-                        break;
-                      case 'linux':
-                        exec('xdg-open ' + outFile);
-                        break;
-                      default:
-                        exec(outFile);
+                var space = '\x20';            
+                var targetExec = 'pandoc' + space + inFile + space + '-o' + space + outFile + space + pandocOptions;
+                console.log('debug: exec ' + targetExec);
+
+                
+                var child = exec(targetExec, { cwd: filePath }, function(error, stdout, stderr) {
+                    if (stdout !== null) {
+                        console.log(stdout.toString());
+                        pandocOutputChannel.append(stdout.toString() + '\n');
                     }
-                }
-            });
+                    
+                    if (stderr !== null) {
+                        console.log(stderr.toString());
+                        if (stderr !== "") {
+                        vscode.window.showErrorMessage('stderr: ' + stderr.toString());
+                        pandocOutputChannel.append('stderr: ' + stderr.toString() + '\n');
+                        }
+                    }
+                    
+                    if (error !== null) {
+                        console.log('exec error: ' + error);
+                        vscode.window.showErrorMessage('exec error: ' + error);
+                        pandocOutputChannel.append('exec error: ' + error + '\n');
+                    } else {
+                        setStatusBarText('Launching', qpSelection.label);
+                        switch(process.platform) {
+                          case 'darwin':
+                            exec('open ' + outFile);
+                            break;
+                          case 'linux':
+                            exec('xdg-open ' + outFile);
+                            break;
+                          default:
+                            exec(outFile);
+                        }
+                    }
+                });
+            }
+            
         });
     });
 	
